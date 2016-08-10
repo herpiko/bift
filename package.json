@@ -1,0 +1,17 @@
+{
+  "name": "bift",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node node_modules/.bin/_mocha -t 100000000 index.js"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ftp-server": "^0.1.0",
+    "mocha": "^3.0.2",
+    "readline-sync": "^1.4.4",
+    "should": "^10.0.0"
+  }
+}
