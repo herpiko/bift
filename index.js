@@ -64,9 +64,16 @@ describe('Legacy', function() {
     it('Clean Installation', function(done) {
       preparation({
         scenario : 'LEGACY_MBR_CLEANINSTALL',
-        headless : true
+        headless : true,
+        uefi : false
       }, function(){
-    		console.log('Installation complete');
+        // Check the partition layout
+        execSync(`cat blankon-installer.log | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
+        execSync(`cat blankon-installer.log | grep "BIOS boot" | cut -d' ' -f1`).toString().should.equal('/dev/sda1\n');
+        execSync(`cat blankon-installer.log | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('/dev/sda2\n');
+        execSync(`cat blankon-installer.log | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('/dev/sda3\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
         done();
       })
     });

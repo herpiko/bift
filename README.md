@@ -4,6 +4,7 @@ BIFT is stand for BlankOn Installer Functional Testing.  A tool for testing the 
 
 #### Requirements
 
+- An ISO image file of `http://cdimage.blankonlinux.or.id/blankon/livedvd-harian/current/`. Put it in the `bift` direcotry.
 - Python module `pyftpdlib`
 - NodeJS
 - Qemu
