@@ -6,11 +6,12 @@ var execSync = require('child_process').execSync;
 var exec = require('child_process').exec;
 var readline = require('readline-sync');
 
-var isoPath = '/home/herpiko/Downloads/iso/tambora-desktop-amd64.iso';
+var isoPath = '/home/herpiko/livecdtmp/modifikasi.iso';
 
 // Run the file transfer protocol on 2121
-ftpd.fsOptions.root = __dirname + '/';
-ftpd.listen(2121);
+/* ftpd.fsOptions.root = __dirname + '/'; */
+/* ftpd.listen(2121); */
+exec('python -m pyftpdlib -w 2121');
 
 describe('Legacy', function() {
   describe('Partition table : MBR', function() {
@@ -25,13 +26,12 @@ describe('Legacy', function() {
       var timeout = false;
       var timeoutTimer = setTimeout(function(){
         timeout = true;
-      }, (1000 * 20));
+      }, (1000 * 200000));
       // Check the timeout and report log for each 10 seconds
       var intervalTimer = setInterval(function(){
         should.equal(-1, [1,2,3].indexOf(4));
-        console.log(timeout);
         if (timeout) {
-          // Killal lthe qemu instance
+          // Killall the qemu instance
           execSync(`killall qemu-system-x86_64`);
           console.log('Timeout');
           true.should.equal(false);
@@ -41,7 +41,7 @@ describe('Legacy', function() {
           done();
         } else {
           // Check for the log files
-          done();
+          /* done(); */
         }
       }, 1000)
     });
