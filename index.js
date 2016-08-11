@@ -6,8 +6,7 @@ var execSync = require('child_process').execSync;
 var exec = require('child_process').exec;
 var readline = require('readline-sync');
 
-var isoPath = '/home/herpiko/livecdtmp/modifikasi.iso';
-/* var isoPath = 'tambora-desktop-amd64.iso'; */
+var isoPath = 'tambora-desktop-amd64.iso';
 
 // Run the file transfer protocol on 2121
 exec('python -m pyftpdlib -w 2121');
