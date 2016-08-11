@@ -6,7 +6,8 @@ var execSync = require('child_process').execSync;
 var exec = require('child_process').exec;
 var readline = require('readline-sync');
 
-var isoPath = 'tambora-desktop-amd64.iso';
+var isoPath = '/home/herpiko/livecdtmp/modifikasi.iso';
+/* var isoPath = 'tambora-desktop-amd64.iso'; */
 
 // Run the file transfer protocol on 2121
 exec('python -m pyftpdlib -w 2121');
@@ -18,6 +19,9 @@ var preparation = function(option, cb){
   // Prepare qemu image
   execSync('rm -f disk');
   execSync('qemu-img create -f raw disk 8G');
+  if (option.scenario === 'legacy_mbr_easy_emptydisk') {
+    execSync('(echo o;echo w) | /sbin/fdisk disk');
+  }
   // The scenario
   execSync(`echo "${option.scenario}" > scenario`);
   // Run qemu instance
@@ -25,7 +29,7 @@ var preparation = function(option, cb){
   if (option.headless) {
     headless = '-nographic';
   }
-  exec(`qemu-system-x86_64 ${headless} -cdrom ${isoPath} -drive file=disk,format=raw -m 2G -enable-kvm -net nic -net user`);
+  exec(`qemu-system-x86_64 ${headless} -boot d -cdrom ${isoPath} -drive file=disk,format=raw -m 2G -enable-kvm -net nic -net user -monitor unix:${__dirname}/monitor,server,nowait`);
   timeout = false;
   timeoutTimer = setTimeout(function(){
     timeout = true;
@@ -40,8 +44,10 @@ var preparation = function(option, cb){
       clearTimeout(timeoutTimer);
       clearInterval(intervalTimer);
       // Killall the qemu instance
-      execSync(`killall qemu-system-x86_64 > /dev/null`);
-      done();
+      execSync(`echo system_powerdown | socat - UNIX-CONNECT:monitor`);
+      setTimeout(function(){
+        cb();
+      }, 5000)
     } else {
       try {
       	fs.accessSync(__dirname + '/blankon-installer.log', fs.F_OK);
@@ -49,8 +55,10 @@ var preparation = function(option, cb){
         clearTimeout(timeoutTimer);
         clearInterval(intervalTimer);
         // Killall the qemu instance
-        execSync(`killall qemu-system-x86_64 > /dev/null`);
-        cb();
+        execSync(`echo system_powerdown | socat - UNIX-CONNECT:monitor`);
+        setTimeout(function(){
+          cb();
+        }, 5000)
       } catch (e) {
       	// It isn't accessible
       }
@@ -63,15 +71,35 @@ describe('Legacy', function() {
   describe('Partition table : MBR', function() {
     it('Clean Installation', function(done) {
       preparation({
-        scenario : 'LEGACY_MBR_CLEANINSTALL',
-        headless : true,
+        scenario : 'legacy_mbr_cleaninstall',
+        headless : false,
         uefi : false
       }, function(){
+        console.log('Installation complete.');
         // Check the partition layout
-        execSync(`cat blankon-installer.log | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
-        execSync(`cat blankon-installer.log | grep "BIOS boot" | cut -d' ' -f1`).toString().should.equal('/dev/sda1\n');
-        execSync(`cat blankon-installer.log | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('/dev/sda2\n');
-        execSync(`cat blankon-installer.log | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('/dev/sda3\n');
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
+        execSync(`/sbin/fdisk -l disk | grep "BIOS boot" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('disk2\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('disk3\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
+    it('Install to empty disk', function(done) {
+      preparation({
+        scenario : 'legacy_mbr_easy_emptydisk',
+        headless : false,
+        uefi : false
+      }, function(){
+        console.log('Installation complete.');
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: dos" | cut -d':' -f2`).toString().should.equal(' dos\n');
+        execSync(`/sbin/fdisk -l disk | grep "Extended" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "82 Linux swap" | cut -d' ' -f1`).toString().should.equal('disk5\n');
+        execSync(`/sbin/fdisk -l disk | grep "83 Linux" | cut -d' ' -f1`).toString().should.equal('disk6\n');
         // Should has no physical sector boundary issue
         execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
         done();
