@@ -5,6 +5,7 @@ BIFT is stand for BlankOn Installer Functional Testing.  A tool for testing the 
 #### Requirements
 
 - An ISO image file of `http://cdimage.blankonlinux.or.id/blankon/livedvd-harian/current/`. Put it in the `bift` direcotry.
+- `socat`
 - Python module `pyftpdlib`
 - NodeJS
 - Qemu
@@ -20,7 +21,7 @@ The current BlankOn Installer (`blankon-installer` and `blankon-installer-ui`) c
 
 A scenario string consists of three or more underscore separated word. The first word represent wether the system is a legacy BIOS or UEFI. The second string is the partition table type. The rest are the scenario detail. Example :
 
-`LEGACY_MBR_CLEANINSTALL`
+`legacy_mbr_cleaninstall`
 
 Once the each installation complete, the post script will upload the installation logs to qemu host and BIFT will check at them.
 
