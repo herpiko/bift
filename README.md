@@ -19,9 +19,21 @@ BIFT is stand for BlankOn Installer Functional Testing.  A tool for testing the 
 
 The current BlankOn Installer (`blankon-installer` and `blankon-installer-ui`) code base was included a pre script that fetch a scenario from `ftp://10.0.2.2:2121/scenario` (the default IP assigned to qemu host) and passing it to `blankon-instaler-ui`. The instaler will run with `DEBUG`, `AUTOFILL`, and `SCENARIO` environment variables that automate the installation process.
 
-A scenario string consists of three or more underscore separated word. The first word represent wether the system is a legacy BIOS or UEFI. The second string is the partition table type. The rest are the scenario detail. Example :
+The `scenario` are a JSON file that represents the step that will be taken on installation.
 
-`legacy_mbr_cleaninstall`
+```
+{
+  "partitionTable" : String,
+  "data" : {
+    "device" : Number,
+    "device_path" : String,
+    "partition" : Number,
+    "cleanInstall" : Boolean,
+    "advancedInstall" : Boolean,
+    "partitionSteps" : Object
+  }
+}
+```
 
 Once the each installation complete, the post script will upload the installation logs to qemu host and BIFT will check at them.
 
