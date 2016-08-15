@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "node node_modules/.bin/_mocha -t 100000000 index.js"
+    "test": "node node_modules/.bin/_mocha -t 3600000 index.js"
   },
   "author": "",
   "license": "MIT",
