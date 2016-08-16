@@ -32,11 +32,15 @@ var preparation = function(option, cb){
   // The scenario
   execSync(`echo "${JSON.stringify(JSON.stringify(option.scenario))}" > scenario`);
   // Run qemu instance
+  var uefi = '';
+  if (option.uefi) {
+    uefi = '-bios /usr/share/qemu/OVMF.fd';
+  }
   var headless = '';
   if (option.headless) {
     headless = '-nographic';
   }
-  exec(`qemu-system-x86_64 ${headless} -boot d -cdrom ${isoPath} -drive file=disk,format=raw -m 2G -enable-kvm -net nic -net user -monitor unix:${__dirname}/monitor,server,nowait`);
+  exec(`qemu-system-x86_64 -nodefaults -boot d -cdrom ${isoPath} -drive file=disk,format=raw -m 2G -enable-kvm -net nic -net user -monitor unix:${__dirname}/monitor,server,nowait -serial vc -vga virtio ${uefi} ${headless}`);
   timeout = false;
   timeoutTimer = setTimeout(function(){
     timeout = true;
@@ -58,12 +62,14 @@ var preparation = function(option, cb){
     } else {
       try {
       	fs.accessSync(__dirname + '/blankon-installer.log', fs.F_OK);
+      	fs.accessSync(__dirname + '/blankon-installer.parted.log', fs.F_OK);
       	// Do something
         clearTimeout(timeoutTimer);
         clearInterval(intervalTimer);
         // Killall the qemu instance
         execSync(`echo system_powerdown | socat - UNIX-CONNECT:monitor`);
         setTimeout(function(){
+          console.log('Installation complete.');
           cb();
         }, 5000)
       } catch (e) {
@@ -90,7 +96,6 @@ describe('Legacy', function() {
         headless : false,
         uefi : false
       }, function(){
-        console.log('Installation complete.');
         // Check the partition layout
         execSync('/sbin/fdisk -l disk');
         execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
@@ -116,7 +121,6 @@ describe('Legacy', function() {
         headless : false,
         uefi : false,
       }, function(){
-        console.log('Installation complete.');
         // Check the partition layout
         execSync('/sbin/fdisk -l disk');
         execSync(`/sbin/fdisk -l disk | grep "Disklabel type: dos" | cut -d':' -f2`).toString().should.equal(' dos\n');
@@ -142,7 +146,6 @@ describe('Legacy', function() {
         uefi : false,
         keepDisk : true
       }, function(){
-        console.log('Installation complete.');
         // Check the partition layout
         execSync('/sbin/fdisk -l disk');
         execSync(`/sbin/fdisk -l disk | grep "Disklabel type: dos" | cut -d':' -f2`).toString().should.equal(' dos\n');
@@ -170,11 +173,91 @@ describe('Legacy', function() {
         headless : false,
         uefi : false
       }, function(){
-        console.log('Installation complete.');
         // Check the partition layout
         execSync('/sbin/fdisk -l disk');
         execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
         execSync(`/sbin/fdisk -l disk | grep "BIOS boot" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('disk2\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('disk3\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
+  });
+});
+describe('UEFI', function() {
+  describe('Partition table : MBR', function() {
+    it('Clean Installation', function(done) {
+      var scenario = {
+        partitionTable : 'mbr',
+        data : {
+          cleanInstall : true,
+          device : 0,
+          device_path : '/dev/sda',
+        }
+      }
+      preparation({
+        scenario : scenario,
+        headless : false,
+        uefi : true
+      }, function(){
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
+        execSync(`/sbin/fdisk -l disk | grep "EFI System" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('disk2\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('disk3\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
+  });
+  describe('Partition table : GPT', function() {
+    it('Clean Installation', function(done) {
+      var scenario = {
+        partitionTable : 'gpt',
+        data : {
+          cleanInstall : true,
+          device : 0,
+          device_path : '/dev/sda',
+        }
+      }
+      preparation({
+        scenario : scenario,
+        headless : false,
+        uefi : true
+      }, function(){
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
+        execSync(`/sbin/fdisk -l disk | grep "EFI System" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('disk2\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('disk3\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
+    it('Install to empty disk', function(done) {
+      var scenario = {
+        partitionTable : 'gpt',
+        data : {
+          device : 0,
+          device_path : '/dev/sda',
+          partition : 0,
+        }
+      }
+      preparation({
+        scenario : scenario,
+        headless : false,
+        uefi : true
+      }, function(){
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
+        execSync(`/sbin/fdisk -l disk | grep "EFI System" | cut -d' ' -f1`).toString().should.equal('disk1\n');
         execSync(`/sbin/fdisk -l disk | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('disk2\n');
         execSync(`/sbin/fdisk -l disk | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('disk3\n');
         // Should has no physical sector boundary issue
