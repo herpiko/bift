@@ -4,8 +4,9 @@ Kependekan dari BlankOn Installer Functional Testing, perkakas untuk menguji fun
 
 #### Kebutuhan
 
+- Sistem operasi Debian atau turunannya.
 - Berkas ISO dari `http://cdimage.blankonlinux.or.id/blankon/livedvd-harian/current/`. Letakkan pada direktori `bift`
-- Paket `socat` dan `qemu`
+- Paket `ovmf`, `socat` dan `qemu`
 - Python module `pyftpdlib`, pasang dari `pip`.
 - NodeJS minimal v5
 
