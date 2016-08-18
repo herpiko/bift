@@ -22,12 +22,15 @@ var preparation = function(option, cb){
   } else {
     console.log('Use previous disk state.');
   }
-  if (option.scenario.partitionTable === 'mbr') {
+  if (option.partitionTable === 'mbr') {
     console.log('Wipe disk to MBR');
     execSync('(echo o;echo w) | /sbin/fdisk disk');
-  } else if (option.scenario.partitionTable === 'gpt') {
+  } else if (option.partitionTable === 'gpt') {
     console.log('Wipe disk to GPT');
     execSync('(echo g;echo w) | /sbin/fdisk disk');
+  }
+  if (option.fdisk) {
+    execSync(option.fdisk);
   }
   // The scenario
   execSync(`echo "${JSON.stringify(JSON.stringify(option.scenario))}" > scenario`);
@@ -40,7 +43,9 @@ var preparation = function(option, cb){
   if (option.headless) {
     headless = '-nographic';
   }
-  exec(`qemu-system-x86_64 -nodefaults -boot d -cdrom ${isoPath} -drive file=disk,format=raw -m 2G -enable-kvm -net nic -net user -monitor unix:${__dirname}/monitor,server,nowait -serial vc -vga virtio ${uefi} ${headless}`);
+  var qemu = `qemu-system-x86_64 -nodefaults -boot d -cdrom ${isoPath} -drive file=disk,format=raw -m 2G -enable-kvm -net nic -net user -monitor unix:${__dirname}/monitor,server,nowait -serial vc -vga virtio ${uefi} ${headless}`;
+  console.log(qemu);
+  exec(qemu);
   timeout = false;
   timeoutTimer = setTimeout(function(){
     timeout = true;
@@ -84,7 +89,6 @@ describe('Legacy', function() {
   describe('Partition table : MBR', function() {
     it('Clean Installation', function(done) {
       var scenario = {
-        partitionTable : 'mbr',
         data : {
           cleanInstall : true,
           device : 0,
@@ -92,6 +96,7 @@ describe('Legacy', function() {
         }
       }
       preparation({
+        partitionTable : 'mbr',
         scenario : scenario,
         headless : false,
         uefi : false
@@ -109,7 +114,6 @@ describe('Legacy', function() {
     });
     it('Install to empty disk', function(done) {
       var scenario = {
-        partitionTable : 'mbr',
         data : {
           device : 0,
           device_path : '/dev/sda',
@@ -117,6 +121,7 @@ describe('Legacy', function() {
         }
       }
       preparation({
+        partitionTable : 'mbr',
         scenario : scenario,
         headless : false,
         uefi : false,
@@ -157,11 +162,40 @@ describe('Legacy', function() {
         done();
       })
     });
+    it('Install to an existing logical partition', function(done) {
+      // Skenario Uji Installer #5 : Simple Mode, Disk label msdos, terisi tiga partisi primary, pasang pada extended/logical
+      // http://dev.blankonlinux.or.id/ticket/1482
+      var scenario = {
+        data : {
+          device : 0,
+          device_path : '/dev/sda',
+          partition : 7,
+        }
+      }
+      preparation({
+        partitionTable : 'mbr',
+        scenario : scenario,
+        headless : false,
+        uefi : false,
+        fdisk : '(echo o;echo n;echo p;echo 1;echo "";echo 1M;echo n;echo p;echo 2;echo "";echo 2M;echo n;echo e;echo 3;echo "";echo "";echo w;) | /sbin/fdisk disk',
+      }, function(){
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: dos" | cut -d':' -f2`).toString().should.equal(' dos\n');
+        execSync(`/sbin/fdisk -l disk | grep "1048576" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "2097152" | cut -d' ' -f1`).toString().should.equal('disk2\n');
+        execSync(`/sbin/fdisk -l disk | grep "Extended" | cut -d' ' -f1`).toString().should.equal('disk3\n');
+        execSync(`/sbin/fdisk -l disk | grep "82 Linux swap" | cut -d' ' -f1`).toString().should.equal('disk5\n');
+        execSync(`/sbin/fdisk -l disk | grep "12578832" | cut -d' ' -f1`).toString().should.equal('disk6\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
   });
   describe('Partition table : GPT', function() {
     it('Clean Installation', function(done) {
       var scenario = {
-        partitionTable : 'gpt',
         data : {
           cleanInstall : true,
           device : 0,
@@ -169,6 +203,34 @@ describe('Legacy', function() {
         }
       }
       preparation({
+        partitionTable : 'gpt',
+        scenario : scenario,
+        headless : false,
+        uefi : false
+      }, function(){
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk');
+        execSync(`/sbin/fdisk -l disk | grep "Disklabel type: gpt" | cut -d':' -f2`).toString().should.equal(' gpt\n');
+        execSync(`/sbin/fdisk -l disk | grep "BIOS boot" | cut -d' ' -f1`).toString().should.equal('disk1\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux swap" | cut -d' ' -f1`).toString().should.equal('disk2\n');
+        execSync(`/sbin/fdisk -l disk | grep "Linux filesystem" | cut -d' ' -f1`).toString().should.equal('disk3\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
+    it('Install on empty disk', function(done) {
+      // Skenario Uji Installer #10 : Simple Mode, tanpa Disk label, kosong
+      // http://dev.blankonlinux.or.id/ticket/1498
+      var scenario = {
+        data : {
+          partition : 0,
+          device : 0,
+          device_path : '/dev/sda',
+        }
+      }
+      preparation({
+        partitionTable : 'gpt',
         scenario : scenario,
         headless : false,
         uefi : false
@@ -186,11 +248,10 @@ describe('Legacy', function() {
     });
   });
 });
-describe('UEFI', function() {
+describe.skip('UEFI', function() {
   describe('Partition table : MBR', function() {
     it('Clean Installation', function(done) {
       var scenario = {
-        partitionTable : 'mbr',
         data : {
           cleanInstall : true,
           device : 0,
@@ -198,6 +259,7 @@ describe('UEFI', function() {
         }
       }
       preparation({
+        partitionTable : 'mbr',
         scenario : scenario,
         headless : false,
         uefi : true
@@ -217,7 +279,6 @@ describe('UEFI', function() {
   describe('Partition table : GPT', function() {
     it('Clean Installation', function(done) {
       var scenario = {
-        partitionTable : 'gpt',
         data : {
           cleanInstall : true,
           device : 0,
@@ -225,6 +286,7 @@ describe('UEFI', function() {
         }
       }
       preparation({
+        partitionTable : 'gpt',
         scenario : scenario,
         headless : false,
         uefi : true
@@ -242,7 +304,6 @@ describe('UEFI', function() {
     });
     it('Install to empty disk', function(done) {
       var scenario = {
-        partitionTable : 'gpt',
         data : {
           device : 0,
           device_path : '/dev/sda',
@@ -250,6 +311,7 @@ describe('UEFI', function() {
         }
       }
       preparation({
+        partitionTable : 'gpt',
         scenario : scenario,
         headless : false,
         uefi : true
