@@ -209,6 +209,37 @@ describe('Legacy', function() {
         done();
       })
     });
+    it('Install to second drive, empty', function(done) {
+      // Skenario Uji Installer #9 : Simple Mode, Harddisk kedua, Disk label msdos, terisi satu partisi primary
+      // http://dev.blankonlinux.or.id/ticket/1485
+      var scenario = {
+        data : {
+          device : 1,
+          device_path : '/dev/sdb',
+          partition : 0,
+        }
+      }
+      preparation({
+        partitionTable : 'mbr',
+        scenario : scenario,
+        headless : false,
+        uefi : false,
+        disks : [
+          {fdisk : '(echo o;echo w;) | /sbin/fdisk disk0'},
+          {fdisk : '(echo o;echo w;) | /sbin/fdisk disk1'},
+        ]
+      }, function(){
+        // Check the partition layout
+        execSync('/sbin/fdisk -l disk1');
+        execSync(`/sbin/fdisk -l disk1 | grep "Disklabel type: dos" | cut -d':' -f2`).toString().should.equal(' dos\n');
+        execSync(`/sbin/fdisk -l disk1 | grep "Extended" | cut -d' ' -f1`).toString().should.equal('disk1p1\n');
+        execSync(`/sbin/fdisk -l disk1 | grep "82 Linux swap" | cut -d' ' -f1`).toString().should.equal('disk1p5\n');
+        execSync(`/sbin/fdisk -l disk1 | grep "83 Linux" | cut -d' ' -f1`).toString().should.equal('disk1p6\n');
+        // Should has no physical sector boundary issue
+        execSync(`cat blankon-installer.log | grep "does not start on physical sector boundary";echo $?`).toString().should.equal('1\n');
+        done();
+      })
+    });
   });
   describe('Partition table : GPT', function() {
     it('Clean Installation', function(done) {
